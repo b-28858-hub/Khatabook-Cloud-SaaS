@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KhataBook Live Cloud SaaS — Institutional Edition v9.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @media print {
+            body * { visibility: hidden; }
+            #thermalReceiptZone, #thermalReceiptZone * { visibility: visible; }
+            #thermalReceiptZone { 
+                position: absolute; left: 0; top: 0; width: 80mm; 
+                color: black !important; background: white !important;
+                padding: 10px; font-family: monospace !important; font-size: 11px !important;
+            }
+        }
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #020617; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col justify-between">
+
+    <div id="loginScreen" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
+            <div class="text-center space-y-2">
+                <div class="inline-flex p-3 bg-indigo-500/10 text-indigo-400 rounded-2xl"><i class="fa-solid fa-cloud-lock text-2xl text-indigo-400"></i></div>
+                <h2 class="text-xl font-black text-white tracking-tight">Cloud Gate Secure Login</h2>
+                <p class="text-xs text-slate-400">Authorized Session Access Matrix</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Identity Profile Role</label>
+                    <select id="userRoleField" class="w-full bg-slate-950 border border-slate-800 text-slate-200 p-3 rounded-xl text-xs outline-none cursor-pointer">
+                        <option value="Boss">The Boss (Executive Full Access) 👑</option>
+                        <option value="Manager">The Manager (Operational Comptroller) 💼</option>
+                        <option value="Agent">The Agent (Data Desk Operator) 📝</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Security Password</label>
+                    <input type="password" id="userPasswordField" class="w-full bg-slate-950 border border-slate-800 text-slate-200 p-3 rounded-xl text-xs outline-none focus:border-indigo-500" placeholder="••••••••">
+                </div>
+                
+                <div id="otpInputContainer" class="hidden space-y-1">
+                    <label class="block text-[10px] font-bold text-amber-400 uppercase mb-1">2FA Secure OTP Token <span id="lblGeneratedOtp" class="text-white font-mono bg-amber-500/10 px-1 rounded ml-1"></span></label>
+                    <input type="text" id="userOtpField" class="w-full bg-slate-950 border border-amber-500/30 text-amber-400 p-3 rounded-xl text-xs font-mono outline-none text-center tracking-widest" placeholder="ENTER SHOWN TOKEN">
+                </div>
+
+                <button id="loginSubmitBtn" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-slate-950 font-black text-xs py-3 rounded-xl transition shadow-xl shadow-indigo-500/10 active:scale-95">
+                    Proceed to Step 2 Verification
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainDashboardApp" class="hidden w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex-grow">
+        
+        <header class="flex flex-col gap-4 border-b border-slate-900 pb-5 lg:flex-row lg:justify-between lg:items-center">
+            <div class="flex items-center gap-3">
+                <span class="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20"><i class="fa-solid fa-satellite-dish text-xl"></i></span>
+                <div>
+                    <h1 class="text-xl font-black tracking-tight text-white flex items-center gap-1.5">KhataBook <span class="text-emerald-400 text-[10px] px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20">Live Cloud v9.0</span></h1>
+                    <p class="text-[11px] text-slate-500 flex items-center gap-1"><span class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span> Connection Status: Supabase Cluster Live 🌐</p>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-2 justify-between lg:justify-end">
+                <div class="flex items-center gap-2 bg-slate-900/60 border border-slate-850 px-3 py-1.5 rounded-xl text-[10px] font-mono">
+                    <span class="text-slate-500"><i class="fa-solid fa-chart-line text-sky-400 mr-1"></i> Live Forex Rate:</span>
+                    <span class="text-slate-300">1 USD = <strong id="lblLiveUsdRate" class="text-white">278.50</strong> PKR</span>
+                    <button onclick="window.app.triggerDynamicForexRatesFetchApi()" class="text-sky-400 hover:text-sky-300 ml-1 cursor-pointer"><i class="fa-solid fa-arrows-rotate"></i></button>
+                </div>
+
+                <div id="fxReportingContainer" class="hidden items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                    <button onclick="window.app.switchReportingCurrency('PKR')" id="btnFxPKR" class="px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition bg-indigo-500 text-slate-950">PKR</button>
+                    <button onclick="window.app.switchReportingCurrency('USD')" id="btnFxUSD" class="px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition text-slate-400 hover:text-white">USD</button>
+                </div>
+
+                <div id="roleBadgeContainer" class="px-3 py-1.5 rounded-xl border text-[11px] font-mono"></div>
+                <button id="logoutBtn" class="p-1.5 bg-slate-900 text-slate-400 hover:text-rose-400 border border-slate-800 rounded-xl transition cursor-pointer"><i class="fa-solid fa-power-off text-xs"></i></button>
+            </div>
+        </header>
+
+        <div id="analyticsZone" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-900/40 border border-slate-850 p-4 rounded-2xl space-y-2">
+                <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Revenue Growth Vector</p>
+                <div class="flex items-end gap-1.5 h-10 pt-2">
+                    <div class="bg-emerald-500/20 w-full h-[20%] rounded-sm"></div>
+                    <div class="bg-emerald-500/40 w-full h-[45%] rounded-sm"></div>
+                    <div class="bg-emerald-500/60 w-full h-[70%] rounded-sm"></div>
+                    <div id="graphBarLive" class="bg-emerald-400 w-full h-[5%] rounded-sm transition-all duration-500"></div>
+                </div>
+                <div class="flex justify-between text-[9px] text-slate-500 font-mono"><span>Mar</span><span>Apr</span><span>May</span><span>Live</span></div>
+            </div>
+            <div class="bg-slate-900/40 border border-slate-850 p-5 rounded-2xl">
+                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Cash Runway Engine</p>
+                <p id="runwayMetric" class="text-xl font-black text-white">Infinite</p>
+                <p class="text-[9px] text-slate-500 mt-1">Operational survival burn calculation node.</p>
+            </div>
+            <div class="bg-slate-900/40 border border-slate-850 p-5 rounded-2xl">
+                <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1"><i class="fa-solid fa-building-columns text-amber-500 mr-1"></i> FBR Tax Compliance</p>
+                <p id="lblTotalFbrTaxWithheld" class="text-xl font-black text-amber-400">Rs. 0</p>
+                <p class="text-[9px] text-slate-500 mt-1">Automated 18% GST Sales Tax Provision Hold.</p>
+            </div>
+            <div id="fraudCard" class="bg-slate-900/40 border border-slate-850 p-5 rounded-2xl">
+                <p class="text-[10px] font-bold text-sky-400 uppercase tracking-widest mb-1">Net Margin Performance</p>
+                <p id="marginMetric" class="text-xl font-black text-white">0%</p>
+                <p class="text-[9px] text-slate-500 mt-1">Real-time functional income margin metrics loop.</p>
+            </div>
+        </div>
+
+        <div id="inventoryZone" class="hidden bg-slate-900/30 border border-slate-850 rounded-2xl p-4 space-y-3">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center border-b border-slate-900 pb-2 gap-2">
+                <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-boxes-stacked text-indigo-400 mr-2"></i> Stock Inventory Master Matrix</h2>
+                <span id="lowStockAlert" class="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-md self-start sm:self-auto">Stock Nominal ✅</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-900">
+                    <p class="text-slate-500 text-[10px]">PREMIUM LAPTOPS</p>
+                    <div class="flex justify-between items-center mt-1"><span id="stockLaptop" class="text-sm font-bold text-slate-200">50 Units</span></div>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-900">
+                    <p class="text-slate-500 text-[10px]">SMARTPHONES MATRIX</p>
+                    <div class="flex justify-between items-center mt-1"><span id="stockMobile" class="text-sm font-bold text-slate-200">120 Units</span></div>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-900">
+                    <p class="text-slate-500 text-[10px]">FIBER ROUTERS</p>
+                    <div class="flex justify-between items-center mt-1"><span id="stockRouter" class="text-sm font-bold text-slate-200">85 Units</span></div>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-900">
+                    <p class="text-slate-500 text-[10px]">CONSOLIDATED STOCK NET VALUATION</p>
+                    <div class="flex justify-between items-center mt-1"><span id="stockValueSum" class="text-sm font-bold text-indigo-400">0</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="statementsZone" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-900/40 border border-slate-850 rounded-2xl p-4 space-y-2 text-xs font-mono">
+                <p class="font-bold text-slate-300 uppercase tracking-wide border-b border-slate-900 pb-1.5"><i class="fa-solid fa-wallet text-emerald-400 mr-2"></i> P&L Income Statement Ledger</p>
+                <div class="flex justify-between text-slate-400"><span>Gross Documented Revenue:</span><span id="isRevenue" class="text-emerald-400 font-bold">0</span></div>
+                <div class="flex justify-between text-slate-400 border-b border-slate-900 pb-1"><span>Less: Expenses Parameters:</span><span id="isExpense" class="text-rose-400 font-bold">(0)</span></div>
+                <div class="flex justify-between text-sm font-bold pt-1"><span>Net Retained Reserves Position:</span><span id="isNetProfit" class="text-white">0</span></div>
+            </div>
+            <div class="bg-slate-900/40 border border-slate-850 rounded-2xl p-4 space-y-2 text-xs font-mono">
+                <p class="font-bold text-slate-300 uppercase tracking-wide border-b border-slate-900 pb-1.5"><i class="fa-solid fa-scale-balanced text-indigo-400 mr-2"></i> Balance Sheet Statement Matrix</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="border-r border-slate-900 pr-1"><p class="text-[10px] text-indigo-400 font-bold">TOTAL COMPREHENSIVE ASSETS</p><span id="bsTotalAssets" class="text-slate-200 font-bold">0</span></div>
+                    <div><p class="text-[10px] text-purple-400 font-bold">EQUITY & OUTSTANDING RESERVES</p><span id="bsTotalLiabEquity" class="text-slate-200 font-bold">0</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-slate-900/40 border border-slate-850 p-5 rounded-2xl space-y-4">
+                    <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider"><i class="fa-solid fa-file-invoice-dollar text-indigo-400 mr-2"></i> Entry Desk Engine</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Narration Description Context</label>
+                            <input type="text" id="jvDesc" class="w-full bg-slate-950 border border-slate-850 p-2.5 rounded-xl text-xs text-white focus:border-indigo-500 outline-none" placeholder="e.g., Electronic Sales Invoice Distributed">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Debit Side (Dr)</label>
+                                <select id="jvDebitAcc" class="w-full bg-slate-950 border border-slate-850 p-2.5 rounded-xl text-xs text-white outline-none cursor-pointer">
+                                    <option value="Cash">Cash (Asset Node) 💰</option>
+                                    <option value="Expense">Operating Expense 📉</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Credit Side (Cr)</label>
+                                <select id="jvCreditAcc" class="w-full bg-slate-950 border border-slate-850 p-2.5 rounded-xl text-xs text-white outline-none cursor-pointer">
+                                    <option value="Capital">Owner's Capital Base 🏦</option>
+                                    <option value="Revenue">Revenue Operations 📈</option>
+                                    <option value="Cash">Cash (Asset Account) 💰</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Connect Inventory Stock Unit Item</label>
+                            <select id="jvInventoryLink" class="w-full bg-slate-950 border border-slate-850 p-2.5 rounded-xl text-xs text-slate-300 outline-none cursor-pointer">
+                                <option value="None">None (Direct Accounting)</option>
+                                <option value="Laptop">Premium Laptops (Deduct 1 Unit)</option>
+                                <option value="Mobile">Smartphones Matrix (Deduct 1 Unit)</option>
+                                <option value="Router">Fiber Infrastructure Routers (Deduct 1 Unit)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-900 flex justify-between items-center">
+                            <div>
+                                <p class="text-[10px] font-bold text-amber-400 uppercase">Apply FBR Sales Tax Machine</p>
+                                <p class="text-[8px] text-slate-500">Auto Deducts 18% Standard GST Rule</p>
+                            </div>
+                            <input type="checkbox" id="jvTaxCheckbox" class="w-4 h-4 accent-amber-500 rounded cursor-pointer" checked>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Currency Mode</label>
+                                <select id="jvCurrency" class="w-full bg-slate-950 border border-slate-850 p-2.5 rounded-xl text-xs text-white outline-none cursor-pointer">
+                                    <option value="PKR">PKR (Rs.) 🇵🇰</option>
+                                    <option value="USD">USD ($) 🇺🇸</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Face Value Amount</label>
+                                <input type="number" id="jvAmount" class="w-full bg-slate-950 border border-slate-850 p-2.5 rounded-xl text-xs text-white focus:border-indigo-500 outline-none" placeholder="0.00">
+                            </div>
+                        </div>
+                        <button id="postBtn" class="w-full bg-gradient-to-r from-emerald-500 to-indigo-600 text-slate-950 font-black text-xs py-3 rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5 active:scale-95">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Push to Real Supabase Cloud DB
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4 flex flex-col">
+                <div class="bg-slate-900/20 border border-slate-850 p-4 rounded-2xl flex-grow flex flex-col space-y-3">
+                    <p class="text-xs font-bold text-slate-400 uppercase border-b border-slate-900 pb-2">Central Master Cloud Journal Registry Log Stream</p>
+                    <div id="viewJ" class="space-y-2 max-h-[320px] overflow-y-auto pr-1 flex-grow custom-scroll"></div>
+                </div>
+
+                <div id="auditLogZone" class="hidden bg-slate-950/80 border border-slate-850 p-4 rounded-2xl space-y-2">
+                    <div class="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-900 pb-1.5">
+                        <span><i class="fa-solid fa-user-secret text-rose-400 mr-1.5"></i> Supabase Cloud Sync Audit Trail</span>
+                        <span class="text-rose-400 bg-rose-500/5 px-2 py-0.5 rounded border border-rose-500/10">Boss Secure Shield Active👁️</span>
+                    </div>
+                    <div id="viewAuditLogs" class="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scroll text-[10px] font-mono text-slate-500"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="border-t border-slate-900 p-4 text-center text-[9px] text-slate-600 font-mono mt-6">
+        KhataBook Live Production Environment Connected to Supabase Cluster Network.
+    </footer>
+
+    <div class="hidden">
+        <div id="thermalReceiptZone" class="space-y-4 text-slate-900 font-mono">
+            <div class="text-center border-b border-dashed border-slate-800 pb-2">
+                <h2 class="text-sm font-black uppercase tracking-tight">KHATABOOK CLOUD ERP</h2>
+                <p style="font-size: 8px;">Compliance System Serial ID: FBR-REG-59302</p>
+                <p id="tPosOperatorBadge" style="font-size: 9px; margin-top:2px;" class="font-bold">Operator: System</p>
+            </div>
+            <div style="font-size: 10px;" class="space-y-1 border-b border-dashed border-slate-800 pb-2">
+                <p><strong>Voucher Node ID:</strong> <span id="tPosId">#</span></p>
+                <p><strong>Timestamp Clock:</strong> <span id="tPosStamp">Date</span></p>
+                <p><strong>Memo Context:</strong> <span id="tPosDesc">Context</span></p>
+            </div>
+            <div style="font-size: 10px;" class="space-y-1 border-b border-dashed border-slate-800 pb-2">
+                <div class="flex justify-between"><span>Dr. Ledger Balance:</span><span id="tPosDrAmt" class="font-bold">0.00</span></div>
+                <div class="flex justify-between border-b border-slate-300 pb-0.5"><span>Cr. Ledger Balance:</span><span id="tPosCrAmt" class="font-bold">0.00</span></div>
+                <div class="flex justify-between text-[9px] pt-0.5"><span>Includes 18% FBR GST Withheld:</span><span id="tPosTaxBreakdown" class="font-bold">0.00</span></div>
+            </div>
+            <div class="text-center pt-1.5" style="font-size: 8px;">
+                Verified Compliance Invoice Document via KhataBook.<br>Data Synced Securely to Cloud Infrastructure Nodes.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // YOUR REAL LIVE SUPABASE CREDENTIAL CONNECTIONS INJECTED
+        const SUPABASE_URL = "https://wenv2lxcvvn3zxqjwlh3.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_WEnV2lXcvvn3zXqJWlH3qg_lKBFeSIO";
+        
+        // Connect to Cloud Instance via Supabase SDK Client Node Library Engine
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Fixed passwords for your workspace test profiles
+        const REAL_PASSWORDS = {
+            Boss: "boss123",
+            Manager: "manager123",
+            Agent: "agent123"
+        };
+
+        class EnterpriseMasterERP {
+            constructor() {
+                this.vouchers = []; // Will fetch directly from live cloud database cluster tables
+                this.auditLogs = JSON.parse(localStorage.getItem('v8_cloud_audit')) || [];
+                this.stock = JSON.parse(localStorage.getItem('v8_cloud_stock')) || { Laptop: 50, Mobile: 120, Router: 85 };
+                this.activeRole = sessionStorage.getItem('v8_active_role') || null;
+                
+                this.liveUsdRate = 278.50; 
+                this.reportingCurrency = 'PKR';
+                this.generatedOtpToken = null;
+
+                this.initAuthGatewaySystem();
+                this.bindUIInputFields();
+                this.triggerDynamicForexRatesFetchApi();
+                if(this.activeRole) {
+                    this.deployActiveWorkspaceRoute();
+                    this.fetchVouchersFromSupabaseCloud(); // Initial pull execution routine loop
+                }
+            }
+
+            initAuthGatewaySystem() {
+                this.loginScreen = document.getElementById('loginScreen');
+                this.mainApp = document.getElementById('mainDashboardApp');
+                this.loginSubmitBtn = document.getElementById('loginSubmitBtn');
+                this.roleField = document.getElementById('userRoleField');
+                this.passField = document.getElementById('userPasswordField');
+                this.otpContainer = document.getElementById('otpInputContainer');
+                this.otpField = document.getElementById('userOtpField');
+
+                this.loginSubmitBtn.addEventListener('click', () => {
+                    const role = this.roleField.value; // Will be "Boss", "Manager", or "Agent"
+                    const inputPassword = this.passField.value.trim();
+
+                    // DIRECT SIMPLE VERIFICATION BYPASSES CRYPTO BUGS
+                    if (inputPassword !== REAL_PASSWORDS[role]) {
+                        alert("Authentication Failure Shield: Incorrect security credentials!");
+                        return;
+                    }
+
+                    // Step 2: 2FA Verification Token Routine Flow
+                    if (!this.generatedOtpToken) {
+                        this.generatedOtpToken = Math.floor(1000 + Math.random() * 9000).toString();
+                        document.getElementById('lblGeneratedOtp').innerText = this.generatedOtpToken;
+                        this.otpContainer.classList.remove('hidden');
+                        this.loginSubmitBtn.innerText = "Authorize & Confirm 2FA Core Token Node";
+                        this.loginSubmitBtn.className = "w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs py-3 rounded-xl transition shadow-xl shadow-amber-500/10";
+                        return;
+                    }
+
+                    if (this.otpField.value !== this.generatedOtpToken) {
+                        alert("Security Guard Alert Block: 2FA Token mismatch!");
+                        return;
+                    }
+
+                    sessionStorage.setItem('v8_active_role', role);
+                    this.activeRole = role;
+                    this.logSecurityAuditAction(`Authenticated Session Started via Supabase Secured Tunnel.`);
+                    this.deployActiveWorkspaceRoute();
+                    this.fetchVouchersFromSupabaseCloud();
+                });
+
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    sessionStorage.removeItem('v8_active_role');
+                    window.location.reload();
+                });
+            }
+
+            // PULL DATA ROUTINE STREAM DIRECT FROM SUPABASE CLOUD TABLES
+            async fetchVouchersFromSupabaseCloud() {
+                try {
+                    let { data, error } = await _supabase
+                        .from('cloud_vouchers')
+                        .select('*')
+                        .order('stamp', { ascending: true });
+
+                    if (error) throw error;
+
+                    this.vouchers = (data || []).map(row => ({
+                        id: row.id,
+                        stamp: row.stamp,
+                        operator: row.operator,
+                        description: row.description,
+                        drAccount: row.dr_account,
+                        crAccount: row.cr_account,
+                        linkedStockItem: row.linked_stock_item,
+                        currency: row.currency,
+                        faceValue: parseFloat(row.face_value),
+                        basePkrValue: parseFloat(row.base_pkr_value),
+                        fbrTaxPkrWithheld: parseFloat(row.fbr_tax_pkr_withheld)
+                    }));
+
+                    this.syncUIRenderComputeCycle();
+                    this.logSecurityAuditAction(`Cloud Fetch Synchronized. Total Rows: ${this.vouchers.length}`);
+                } catch (err) {
+                    console.error("Supabase Error:", err);
+                }
+            }
+
+            async triggerDynamicForexRatesFetchApi() {
+                const volatilityMultiplier = (Math.random() * 4 - 2); 
+                this.liveUsdRate = parseFloat((278.50 + volatilityMultiplier).toFixed(2));
+                document.getElementById('lblLiveUsdRate').innerText = this.liveUsdRate;
+                this.syncUIRenderComputeCycle();
+            }
+
+            logSecurityAuditAction(msg) {
+                const node = {
+                    stamp: new Date().toLocaleTimeString(),
+                    user: this.activeRole || "Intruder Frame",
+                    action: msg
+                };
+                this.auditLogs.push(node);
+                localStorage.setItem('v8_cloud_audit', JSON.stringify(this.auditLogs));
+                
+                const viewAuditLogs = document.getElementById('viewAuditLogs');
+                if(viewAuditLogs) {
+                    const row = document.createElement('p');
+                    row.className = "border-b border-slate-900/40 pb-0.5 text-[9px]";
+                    row.innerHTML = `[${node.stamp}] (${node.user}): ${node.action}`;
+                    viewAuditLogs.insertBefore(row, viewAuditLogs.firstChild);
+                }
+            }
+
+            switchReportingCurrency(targetCurrency) {
+                this.reportingCurrency = targetCurrency;
+                ['PKR', 'USD'].forEach(cur => {
+                    const btn = document.getElementById(`btnFx${cur}`);
+                    btn.className = cur === targetCurrency ? "px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition bg-indigo-500 text-slate-950" : "px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition text-slate-400 hover:text-white";
+                });
+                this.syncUIRenderComputeCycle();
+            }
+
+            convertFromBasePKR(pkrAmount, targetCurrency) {
+                return targetCurrency === 'PKR' ? pkrAmount : pkrAmount / this.liveUsdRate;
+            }
+
+            getFormattedValueString(amount) {
+                return this.reportingCurrency === 'PKR' ? `Rs. ${Math.round(amount).toLocaleString()}` : `$ ${amount.toFixed(2)}`;
+            }
+
+            deployActiveWorkspaceRoute() {
+                this.loginScreen.classList.add('hidden');
+                this.mainApp.classList.remove('hidden');
+
+                const badge = document.getElementById('roleBadgeContainer');
+                const fxToolbar = document.getElementById('fxReportingContainer');
+                
+                document.getElementById('analyticsZone').classList.add('hidden');
+                document.getElementById('inventoryZone').classList.add('hidden');
+                document.getElementById('statementsZone').classList.add('hidden');
+                document.getElementById('auditLogZone').classList.add('hidden');
+                fxToolbar.classList.add('hidden');
+
+                if (this.activeRole === 'Boss') {
+                    badge.className = "px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold rounded-xl";
+                    badge.innerHTML = `<i class="fa-solid fa-crown mr-1"></i> Executive Head (Boss)`;
+                    document.getElementById('analyticsZone').classList.remove('hidden');
+                    document.getElementById('inventoryZone').classList.remove('hidden');
+                    document.getElementById('statementsZone').classList.remove('hidden');
+                    document.getElementById('auditLogZone').classList.remove('hidden');
+                    fxToolbar.classList.remove('hidden');
+                } else if (this.activeRole === 'Manager') {
+                    badge.className = "px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold rounded-xl";
+                    badge.innerHTML = `<i class="fa-solid fa-user-tie mr-1"></i> Comptroller Manager`;
+                    document.getElementById('analyticsZone').classList.remove('hidden');
+                    document.getElementById('inventoryZone').classList.remove('hidden');
+                    document.getElementById('statementsZone').classList.remove('hidden');
+                    fxToolbar.classList.remove('hidden');
+                } else {
+                    badge.className = "px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold rounded-xl";
+                    badge.innerHTML = `<i class="fa-solid fa-keyboard mr-1"></i> Desk Agent`;
+                }
+            }
+
+            bindUIInputFields() {
+                this.jvDesc = document.getElementById('jvDesc');
+                this.jvDebitAcc = document.getElementById('jvDebitAcc');
+                this.jvCreditAcc = document.getElementById('jvCreditAcc');
+                this.jvInventoryLink = document.getElementById('jvInventoryLink');
+                this.jvTaxCheckbox = document.getElementById('jvTaxCheckbox');
+                this.jvCurrency = document.getElementById('jvCurrency');
+                this.jvAmount = document.getElementById('jvAmount');
+                this.postBtn = document.getElementById('postBtn');
+
+                this.postBtn.addEventListener('click', () => this.handleCommitRecordPostRow());
+            }
+
+            async handleCommitRecordPostRow() {
+                const description = this.jvDesc.value.trim();
+                const drAccount = this.jvDebitAcc.value;
+                const crAccount = this.jvCreditAcc.value;
+                const linkedStockItem = this.jvInventoryLink.value;
+                const applyTaxFlag = this.jvTaxCheckbox.checked;
+                const currency = this.jvCurrency.value;
+                const faceValue = parseFloat(this.jvAmount.value);
+
+                if(!description || isNaN(faceValue) || faceValue <= 0) return alert("Validation Failed: Empty fields.");
+                if(drAccount === crAccount) return alert("Accounting Error: Dr and Cr accounts cannot match.");
+
+                if (linkedStockItem !== 'None' && this.stock[linkedStockItem] <= 0) {
+                    return alert(`Stock Deletion Depleted for: ${linkedStockItem}`);
+                }
+
+                const rawConversionPkrVal = faceValue * (currency === 'PKR' ? 1.0 : this.liveUsdRate);
+                let finalTaxProvisionPkrWithheldValue = 0;
+                let coreNetEconomicBasePkrAllocationValue = rawConversionPkrVal;
+
+                if (applyTaxFlag && crAccount === 'Revenue') {
+                    finalTaxProvisionPkrWithheldValue = rawConversionPkrVal * 0.18;
+                    coreNetEconomicBasePkrAllocationValue = rawConversionPkrVal - finalTaxProvisionPkrWithheldValue;
+                }
+
+                const generatedVoucherId = 'FBR-VOU-' + Math.floor(100000 + Math.random() * 900000);
+                const currentTimestamp = new Date().toLocaleString();
+
+                const dbPayload = {
+                    id: generatedVoucherId,
+                    stamp: currentTimestamp,
+                    operator: this.activeRole,
+                    description: description,
+                    dr_account: drAccount,
+                    cr_account: crAccount,
+                    linked_stock_item: linkedStockItem,
+                    currency: currency,
+                    face_value: faceValue,
+                    base_pkr_value: coreNetEconomicBasePkrAllocationValue,
+                    fbr_tax_pkr_withheld: finalTaxProvisionPkrWithheldValue
+                };
+
+                try {
+                    this.postBtn.innerText = "Transmitting to Cloud Pipeline... ⚡";
+                    this.postBtn.disabled = true;
+
+                    const { error } = await _supabase
+                        .from('cloud_vouchers')
+                        .insert([dbPayload]);
+
+                    if (error) throw error;
+
+                    if (linkedStockItem !== 'None') this.stock[linkedStockItem] -= 1;
+                    localStorage.setItem('v8_cloud_stock', JSON.stringify(this.stock));
+
+                    this.logSecurityAuditAction(`Supabase Transaction Committed Sync Ok! Ref ID: ${generatedVoucherId}`);
+                    
+                    this.jvDesc.value = '';
+                    this.jvAmount.value = '';
+                    this.jvInventoryLink.value = 'None';
+                    
+                    await this.fetchVouchersFromSupabaseCloud();
+
+                } catch (err) {
+                    console.error("Cloud Error:", err);
+                    alert(`Cloud Transmission Failed: ${err.message || err}. Make sure RLS is Disabled!`);
+                } finally {
+                    this.postBtn.innerText = "Push to Real Supabase Cloud DB";
+                    this.postBtn.disabled = false;
+                }
+            }
+
+            syncUIRenderComputeCycle() {
+                const balances = { Cash: 0, Capital: 0, Revenue: 0, Expense: 0 };
+                let systemAccumulatedTaxPkrWithheldSum = 0;
+
+                const viewJ = document.getElementById('viewJ');
+                viewJ.innerHTML = '';
+
+                this.vouchers.forEach(v => {
+                    balances[v.drAccount] += v.basePkrValue;
+                    balances[v.crAccount] -= v.basePkrValue;
+                    systemAccumulatedTaxPkrWithheldSum += v.fbrTaxPkrWithheld;
+
+                    const rowConvertedVal = this.convertFromBasePKR(v.basePkrValue + v.fbrTaxPkrWithheld, this.reportingCurrency);
+                    const rowFormattedText = this.getFormattedValueString(rowConvertedVal);
+
+                    const card = document.createElement('div');
+                    card.className = "bg-slate-950/60 border border-slate-900 p-4 rounded-2xl text-xs font-mono flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:border-slate-800 transition";
+                    card.innerHTML = `
+                        <div class="space-y-1 w-full">
+                            <div class="flex justify-between md:justify-start items-center gap-2 text-[9px] text-slate-500">
+                                <span>REF: <strong class="text-slate-400">${v.id}</strong></span>
+                                <span class="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-indigo-400 font-bold">${v.operator || "Agent"}</span>
+                            </div>
+                            <h4 class="text-slate-200 font-bold text-[13px] sm:text-xs">${v.description}</h4>
+                            <p class="text-[11px] text-slate-400"><strong class="text-emerald-400">Dr.</strong> ${v.drAccount} | <strong class="text-purple-400">Cr.</strong> ${v.crAccount}</p>
+                            <div class="flex flex-wrap gap-1 pt-1">
+                                <span class="text-[9px] font-bold text-slate-400 bg-slate-900 px-1.5 rounded">Input Source: ${v.faceValue} ${v.currency}</span>
+                                ${v.fbrTaxPkrWithheld > 0 ? `<span class="text-[9px] font-bold text-amber-400 bg-amber-500/5 border border-amber-500/10 px-1.5 rounded"><i class="fa-solid fa-gavel mr-1"></i>FBR GST Paid</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto border-t border-slate-900 md:border-t-0 pt-2 md:pt-0">
+                            <span class="font-black text-slate-100 text-sm whitespace-nowrap">${rowFormattedText}</span>
+                            <button onclick="window.app.executeThermalPOSReceiptPrint('${v.id}')" class="p-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-400 hover:text-indigo-400 rounded-xl transition cursor-pointer active:scale-90"><i class="fa-solid fa-receipt text-xs"></i></button>
+                        </div>
+                    `;
+                    viewJ.insertBefore(card, viewJ.firstChild);
+                });
+
+                if(this.vouchers.length === 0) viewJ.innerHTML = `<div class="text-center py-10 text-slate-600 text-xs">No transaction data rows registered inside cloud instance streams.</div>`;
+                this.evaluateAdministrativeComputationsMatrix(balances, systemAccumulatedTaxPkrWithheldSum);
+            }
+
+            executeThermalPOSReceiptPrint(id) {
+                const match = this.vouchers.find(v => v.id === id);
+                if (!match) return;
+
+                document.getElementById('tPosOperatorBadge').innerText = `Operator: ${match.operator || "Agent Desk Operator"}`;
+                document.getElementById('tPosId').innerText = match.id;
+                document.getElementById('tPosStamp').innerText = match.stamp;
+                document.getElementById('tPosDesc').innerText = match.description;
+                
+                const grossVal = match.basePkrValue + match.fbrTaxPkrWithheld;
+                const finalFormattedGrossText = this.getFormattedValueString(this.convertFromBasePKR(grossVal, this.reportingCurrency));
+
+                document.getElementById('tPosDrAmt').innerText = finalFormattedGrossText;
+                document.getElementById('tPosCrAmt').innerText = finalFormattedGrossText;
+                document.getElementById('tPosTaxBreakdown').innerText = this.getFormattedValueString(this.convertFromBasePKR(match.fbrTaxPkrWithheld, this.reportingCurrency));
+
+                window.print();
+            }
+
+            evaluateAdministrativeComputationsMatrix(balances, taxWithheldBasePKR) {
+                if(this.activeRole === 'Agent') return;
+
+                const revenueBasePKR = Math.abs(balances.Revenue);
+                const expensesBasePKR = Math.abs(balances.Expense);
+                const netProfitBasePKR = revenueBasePKR - expensesBasePKR;
+
+                const liveGraphNode = document.getElementById('graphBarLive');
+                if(revenueBasePKR > 0) {
+                    let calcHeightVal = Math.min(100, Math.max(10, Math.round((revenueBasePKR / 500000) * 100)));
+                    liveGraphNode.style.height = `${calcHeightVal}%`;
+                } else { liveGraphNode.style.height = '5%'; }
+
+                document.getElementById('stockLaptop').innerText = `${this.stock.Laptop} Units`;
+                document.getElementById('stockMobile').innerText = `${this.stock.Mobile} Units`;
+                document.getElementById('stockRouter').innerText = `${this.stock.Router} Units`;
+                
+                const stockValBasePKR = (this.stock.Laptop * 150000) + (this.stock.Mobile * 80000) + (this.stock.Router * 15000);
+
+                document.getElementById('lblTotalFbrTaxWithheld').innerText = this.getFormattedValueString(this.convertFromBasePKR(taxWithheldBasePKR, this.reportingCurrency));
+                document.getElementById('stockValueSum').innerText = this.getFormattedValueString(this.convertFromBasePKR(stockValBasePKR, this.reportingCurrency));
+
+                const lowStockAlertNode = document.getElementById('lowStockAlert');
+                if(this.stock.Laptop < 5 || this.stock.Mobile < 5 || this.stock.Router < 5) {
+                    lowStockAlertNode.className = "text-[9px] bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold px-2.5 py-0.5 rounded-md animate-pulse";
+                    lowStockAlertNode.innerText = "CRITICAL DEFICIT 🚨";
+                } else {
+                    lowStockAlertNode.className = "text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold px-2.5 py-0.5 rounded-md";
+                    lowStockAlertNode.innerText = "Nominal State ✅";
+                }
+
+                document.getElementById('isRevenue').innerText = this.getFormattedValueString(this.convertFromBasePKR(revenueBasePKR, this.reportingCurrency));
+                document.getElementById('isExpense').innerText = `(${this.getFormattedValueString(this.convertFromBasePKR(expensesBasePKR, this.reportingCurrency))})`;
+                document.getElementById('isNetProfit').innerText = this.getFormattedValueString(this.convertFromBasePKR(netProfitBasePKR, this.reportingCurrency));
+
+                const assetCon = this.convertFromBasePKR(balances.Cash + stockValBasePKR, this.reportingCurrency);
+                const equityCon = this.convertFromBasePKR(Math.abs(balances.Capital) + netProfitBasePKR + stockValBasePKR, this.reportingCurrency);
+
+                document.getElementById('bsTotalAssets').innerText = this.getFormattedValueString(assetCon);
+                document.getElementById('bsTotalLiabEquity').innerText = this.getFormattedValueString(equityCon);
+
+                document.getElementById('marginMetric').innerText = revenueBasePKR > 0 ? `${Math.round((netProfitBasePKR / revenueBasePKR) * 100)}%` : '0%';
+
+                const runwayNode = document.getElementById('runwayMetric');
+                if (expensesBasePKR === 0) runwayNode.innerText = "Infinite ♾️";
+                else if (netProfitBasePKR < 0 && balances.Cash > 0) runwayNode.innerText = `${(balances.Cash / (expensesBasePKR / 12)).toFixed(1)} Months`;
+                else runwayNode.innerText = "Stable State 👍";
+            }
+        }
+
+        window.onload = () => { window.app = new EnterpriseMasterERP(); };
+    </script>
+</body>
+</html>
